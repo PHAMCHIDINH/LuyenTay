@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Luyện gõ phím</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Luyện gõ phím</h1>
+
+    <section class="section">
+      <h2>Cấu hình API (tuỳ chọn khi host frontend tách rời)</h2>
+      <label>API Base URL (ví dụ: https://webluyengophim.onrender.com)</label>
+      <div style="display:flex; gap:8px">
+        <input type="text" id="apiBase" placeholder="Mặc định: trống (cùng nguồn)">
+        <button id="saveApi">Lưu</button>
+      </div>
+      <small id="apiHint" style="color:#94a3b8"></small>
+    </section>
+
+    <section class="section">
+      <h2>1) Thêm tài liệu</h2>
+      <form id="addDocForm">
+        <label>Tiêu đề (tuỳ chọn)</label>
+        <input type="text" id="title" placeholder="Tên tài liệu">
+        <label>Nội dung</label>
+        <textarea id="content" rows="6" placeholder="Dán đoạn văn để luyện gõ..."></textarea>
+        <button type="submit">Thêm</button>
+      </form>
+    </section>
+
+    <section class="section">
+      <h2>2) Chọn tài liệu để luyện</h2>
+      <div id="docs"></div>
+    </section>
+
+  </div>
+  <script src="/main.js"></script>
+  <script>
+  const apiBase = localStorage.getItem('API_BASE') || '';
+  document.getElementById('apiBase').value = apiBase;
+  document.getElementById('apiHint').textContent = apiBase ? `Đang dùng API: ${apiBase}` : 'Đang dùng API cùng nguồn (localhost khi chạy máy bạn)';
+  document.getElementById('saveApi').onclick = () => {
+    const v = document.getElementById('apiBase').value.trim();
+    if (v) localStorage.setItem('API_BASE', v);
+    else localStorage.removeItem('API_BASE');
+    location.reload();
+  };
+  </script>
+</body>
+</html>
