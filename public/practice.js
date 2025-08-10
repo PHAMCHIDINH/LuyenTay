@@ -22,6 +22,7 @@ let docWords = [];
 let streamWords = [];
 let typedWords = [];
 let currentIndex = 0;
+let wordMode = 'random'; // 'random' | 'script'
 let startTime = null;
 let timerId = null;       // metrics updater
 let countdownId = null;   // per-round countdown
@@ -79,14 +80,24 @@ function tokenizeWords(text){
 }
 
 function buildStream(count = 250){
-  // Random sample with replacement from docWords
   if (!docWords.length) return [];
-  const out = [];
-  for (let i=0;i<count;i++){
-    const idx = Math.floor(Math.random() * docWords.length);
-    out.push(docWords[idx]);
+  if (wordMode === 'script'){
+    // Use the document words in original order, repeating if needed to reach count
+    const out = [];
+    while (out.length < count){
+      const remain = Math.min(count - out.length, docWords.length);
+      out.push(...docWords.slice(0, remain));
+    }
+    return out;
+  } else {
+    // Random sample with replacement from docWords
+    const out = [];
+    for (let i=0;i<count;i++){
+      const idx = Math.floor(Math.random() * docWords.length);
+      out.push(docWords[idx]);
+    }
+    return out;
   }
-  return out;
 }
 
 function renderStream(){
@@ -131,6 +142,10 @@ async function init(){
   $('#docTitle').textContent = doc.title;
   docWords = tokenizeWords(doc.content);
   // Initialize first round stream and UI
+  // read saved mode
+  try{ const saved = localStorage.getItem('WORD_MODE'); if (saved) wordMode = saved; }catch{}
+  const modeSel = document.getElementById('wordMode');
+  if (modeSel){ modeSel.value = wordMode; }
   streamWords = buildStream();
   typedWords = [];
   currentIndex = 0;
@@ -346,6 +361,25 @@ document.getElementById('wordInput').addEventListener('keydown', (e)=>{
     }
   }
 });
+
+// Mode selector handling
+const modeSel = document.getElementById('wordMode');
+if (modeSel){
+  modeSel.addEventListener('change', (e)=>{
+    wordMode = e.target.value === 'script' ? 'script' : 'random';
+    try{ localStorage.setItem('WORD_MODE', wordMode); }catch{}
+    // Rebuild stream for current round only if not running to avoid disrupting timing
+    if (testMode.status !== 'running'){
+      streamWords = buildStream();
+      typedWords = [];
+      currentIndex = 0;
+      renderStream();
+      const inp = document.getElementById('wordInput');
+      inp.value = '';
+      updateLiveMetrics();
+    }
+  });
+}
 
 init().catch(err=>{
   console.error(err);
