@@ -62,6 +62,16 @@ app.get('/api/docs/:id', (req, res) => {
   res.json(doc);
 });
 
+app.delete('/api/docs/:id', (req, res) => {
+  const id = req.params.id;
+  const docs = readDocs();
+  const idx = docs.findIndex(d => d.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'not found' });
+  const [deleted] = docs.splice(idx, 1);
+  writeDocs(docs);
+  res.json({ ok: true, deleted: { id: deleted.id, title: deleted.title } });
+});
+
 // scoring endpoint (optional server calc if needed)
 app.post('/api/score', (req, res) => {
   const { target, typed, durationMs } = req.body || {};

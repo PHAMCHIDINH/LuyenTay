@@ -24,9 +24,18 @@ async function loadDocs(){
     el.innerHTML = `<h3>${escapeHtml(d.title)}</h3>
       <p>${escapeHtml(d.content.slice(0, 120))}${d.content.length>120?'…':''}</p>
       <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
-        <a class="btn" href="/practice.html?id=${d.id}">Luyện bài này</a>
-        <small>${new Date(d.createdAt||Date.now()).toLocaleString('vi-VN')}</small>
+        <div style="display:flex; gap:8px; align-items:center">
+          <a class="btn" href="/practice.html?id=${d.id}">Luyện</a>
+          <button class="btn-secondary" data-del="${d.id}">Xóa</button>
+        </div>
+        <small class="muted">${new Date(d.createdAt||Date.now()).toLocaleString('vi-VN')}</small>
       </div>`;
+    const delBtn = el.querySelector('[data-del]');
+    delBtn.onclick = async ()=>{
+      if (!confirm('Xóa tài liệu này?')) return;
+      await fetchJSON('/api/docs/'+d.id, { method:'DELETE' });
+      await loadDocs();
+    };
     container.appendChild(el);
   }
 }
