@@ -84,31 +84,25 @@ app.post('/api/score', (req, res) => {
 
 function computeScore(target, typed, durationMs) {
   const totalChars = target.length;
-  // word-level edit distance to prevent cascading errors
-  const tw = tokenizeWords(target);
-  const yw = tokenizeWords(typed);
-  const errors = wordEditDistance(tw, yw);
+  // character-level edit distance
+  const errors = charEditDistance(target, typed);
 
   const minutes = Math.max(0.001, (durationMs || 0) / 60000);
   const grossWPM = typed.length / 5 / minutes;
-  const netWPM = Math.max(0, grossWPM - errors / minutes);
-  const accuracy = tw.length ? Math.max(0, Math.min(1, (tw.length - errors) / tw.length)) : 1;
+  const netWPM = Math.max(0, grossWPM - (errors / 5) / minutes);
+  const accuracy = totalChars ? Math.max(0, Math.min(1, (totalChars - errors) / totalChars)) : 1;
 
   return { totalChars, typedChars: typed.length, errors, accuracy, grossWPM, netWPM };
 }
 
-function tokenizeWords(s){
-  return (s || '').trim().split(/\s+/).filter(Boolean);
-}
-
-function wordEditDistance(a, b){
+function charEditDistance(a, b){
   const m = a.length, n = b.length;
   const dp = Array.from({length: m+1}, ()=>Array(n+1).fill(0));
   for (let i=0;i<=m;i++) dp[i][0] = i;
   for (let j=0;j<=n;j++) dp[0][j] = j;
   for (let i=1;i<=m;i++){
     for (let j=1;j<=n;j++){
-      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      const cost = a.charAt(i-1) === b.charAt(j-1) ? 0 : 1;
       dp[i][j] = Math.min(
         dp[i-1][j] + 1,
         dp[i][j-1] + 1,
