@@ -18,6 +18,10 @@ async function fetchJSON(url, opts){
 }
 
 let doc = null;
+let docWords = [];
+let streamWords = [];
+let typedWords = [];
+let currentIndex = 0;
 let startTime = null;
 let timerId = null;       // metrics updater
 let countdownId = null;   // per-round countdown
@@ -67,21 +71,54 @@ function escapeHtml(s){
   return s.replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;','\'':'&#39;'}[c]));
 }
 
-function renderDiff(target, typed){
-  let out = '';
-  const len = Math.max(target.length, typed.length);
-  for (let i=0;i<len;i++){
-    const t = target[i] ?? '';
-    const y = typed[i] ?? '';
-    if (y===''){
-      out += escapeHtml(t);
-    } else if (y===t){
-      out += `<span class="mark-correct">${escapeHtml(t)}</span>`;
-    } else {
-      out += `<span class="mark-wrong">${escapeHtml(t||'∅')}</span>`;
-    }
+// 10fastfingers-like flow: render words stream, single-word input, submit on Space/Enter
+function tokenizeWords(text){
+  // Extract word-like tokens (letters incl. Vietnamese range + digits)
+  const m = text.match(/[A-Za-zÀ-ỹà-ỹÁ-Ỹ0-9]+/g);
+  return m ? m : [];
+}
+
+function buildStream(count = 250){
+  // Random sample with replacement from docWords
+  if (!docWords.length) return [];
+  const out = [];
+  for (let i=0;i<count;i++){
+    const idx = Math.floor(Math.random() * docWords.length);
+    out.push(docWords[idx]);
   }
   return out;
+}
+
+function renderStream(){
+  const cont = document.getElementById('wordsStream');
+  cont.innerHTML = '';
+  streamWords.forEach((w, i)=>{
+    const span = document.createElement('span');
+    span.className = 'w' + (i===0 ? ' cur' : '');
+    span.textContent = w;
+    span.dataset.idx = String(i);
+    cont.appendChild(span);
+    cont.appendChild(document.createTextNode(' '));
+  });
+}
+
+function updateCurrentHighlight(){
+  const cont = document.getElementById('wordsStream');
+  const prev = cont.querySelector('.w.cur');
+  if (prev) prev.classList.remove('cur');
+  const cur = cont.querySelector(`.w[data-idx="${currentIndex}"]`);
+  if (cur) {
+    cur.classList.add('cur');
+    // ensure visible
+    try{ cur.scrollIntoView({ block: 'center', inline: 'nearest' }); }catch{}
+  }
+}
+
+function markWordResult(idx, ok){
+  const cont = document.getElementById('wordsStream');
+  const el = cont.querySelector(`.w[data-idx="${idx}"]`);
+  if (!el) return;
+  el.classList.add(ok ? 'ok' : 'bad');
 }
 
 async function init(){
@@ -92,9 +129,14 @@ async function init(){
   }
   doc = await fetchJSON('/api/docs/'+id);
   $('#docTitle').textContent = doc.title;
-  $('#target').innerHTML = renderDiff(doc.content, '');
-  $('#typed').value = '';
-  $('#typed').focus();
+  docWords = tokenizeWords(doc.content);
+  // Initialize first round stream and UI
+  streamWords = buildStream();
+  typedWords = [];
+  currentIndex = 0;
+  renderStream();
+  $('#wordInput').value = '';
+  $('#wordInput').focus();
   resetTimer();
 }
 
@@ -107,7 +149,6 @@ function resetTimer(){
 
 function updateLiveMetrics(){
   if (!doc) return;
-  const typed = $('#typed').value;
   // Chỉ hiển thị lỗi sau khi kết thúc mỗi lần, tránh tính lỗi theo từng phím (IME tiếng Việt)
   const errEl = document.getElementById('errors');
   if (testMode.active && (testMode.status === 'running' || testMode.status === 'waiting')){
@@ -115,15 +156,8 @@ function updateLiveMetrics(){
   } else if (testMode.lastErrors != null){
     errEl.textContent = 'Lỗi: ' + testMode.lastErrors;
   }
-  const words = countWords(typed);
   const wordsEl = document.getElementById('words');
-  if (wordsEl) wordsEl.textContent = 'Từ: ' + words;
-  // Trong khi đang gõ, để giảm nhiễu cho IME tiếng Việt, chỉ hiển thị văn bản gốc
-  if (testMode.active && testMode.status === 'running'){
-    $('#target').textContent = doc.content;
-  } else {
-    $('#target').innerHTML = renderDiff(doc.content, typed);
-  }
+  if (wordsEl) wordsEl.textContent = 'Từ: ' + typedWords.length;
 }
 
 function startCountdown(){
@@ -160,8 +194,13 @@ function startTest(){
   testMode.results = [];
   testMode.status = 'waiting';
   testMode.lastErrors = null;
-  $('#typed').value = '';
-  $('#typed').disabled = false;
+  // Reset round stream
+  streamWords = buildStream();
+  typedWords = [];
+  currentIndex = 0;
+  renderStream();
+  $('#wordInput').value = '';
+  $('#wordInput').disabled = false;
   // start button removed; auto mode
   updateRoundInfo();
   updateTimerUI('Chờ bắt đầu...');
@@ -176,22 +215,30 @@ function prepareNextRound(){
   testMode.round += 1;
   testMode.status = 'waiting';
   testMode.lastErrors = null;
-  $('#typed').value = '';
-  $('#typed').disabled = false;
-  $('#typed').focus();
+  // New stream for the new round
+  streamWords = buildStream();
+  typedWords = [];
+  currentIndex = 0;
+  renderStream();
+  $('#wordInput').value = '';
+  $('#wordInput').disabled = false;
+  $('#wordInput').focus();
   updateRoundInfo();
   updateTimerUI('Chờ bắt đầu...');
   const errEl = document.getElementById('errors'); if (errEl) errEl.textContent = 'Lỗi: —';
 }
 
 function endRound(){
-  const typed = $('#typed').value;
   const dur = Math.min(Date.now() - startTime, timeLimitMs);
-  const s = computeScore(doc.content, typed, dur);
-  s.wordsCount = countWords(typed);
+  // Build target/typed strings based on submitted words only
+  const wordsTyped = typedWords.length;
+  const targetJoined = streamWords.slice(0, wordsTyped).join(' ');
+  const typedJoined = typedWords.join(' ');
+  const s = computeScore(targetJoined, typedJoined, dur);
+  s.wordsCount = wordsTyped;
   testMode.results.push(s);
   if (!testMode.best || s.wordsCount > testMode.best.wordsCount || (s.wordsCount === testMode.best.wordsCount && s.errors < testMode.best.errors)) testMode.best = s;
-  $('#typed').disabled = true;
+  $('#wordInput').disabled = true;
   appendResultCard(testMode.round, s);
   updateBestInfo();
   testMode.lastErrors = s.errors;
@@ -223,7 +270,7 @@ function appendResultCard(round, s){
   document.getElementById('testResults').appendChild(div);
 }
 
-$('#typed').addEventListener('input', updateLiveMetrics);
+$('#wordInput').addEventListener('input', updateLiveMetrics);
 
 function startRoundIfFirstKey(){
   if (testMode.active && testMode.status === 'waiting'){
@@ -276,9 +323,28 @@ function countWords(text){
 }
 
 // Start the round timer when first key is pressed in test mode
-document.getElementById('typed').addEventListener('input', ()=>{
+document.getElementById('wordInput').addEventListener('input', ()=>{
   startRoundIfFirstKey();
   updateLiveMetrics();
+});
+
+// Submit on Space or Enter
+document.getElementById('wordInput').addEventListener('keydown', (e)=>{
+  if (e.key === ' ' || e.code === 'Space' || e.key === 'Enter'){
+    e.preventDefault();
+    const val = (e.target.value || '').trim();
+    // Only advance if user actually typed something
+    if (val.length > 0){
+      const target = streamWords[currentIndex] || '';
+      const ok = val === target;
+      typedWords.push(val);
+      markWordResult(currentIndex, ok);
+      currentIndex += 1;
+      updateCurrentHighlight();
+      e.target.value = '';
+      updateLiveMetrics();
+    }
+  }
 });
 
 init().catch(err=>{

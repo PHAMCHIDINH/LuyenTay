@@ -26,6 +26,10 @@ a.btn:hover{ filter:brightness(1.05) }
 .doc small{ color:var(--muted) }
 .doc button{ margin-top:8px }
 .target{ white-space:pre-wrap; background:#060b16; border:1px dashed #334155; padding:12px; border-radius:6px; min-height:100px }
+.target .w{ padding:2px 4px; margin:2px 2px; display:inline-block; border-radius:4px }
+.target .w.cur{ outline:2px solid var(--accent); background:#0a1628 }
+.target .w.ok{ color:#22c55e }
+.target .w.bad{ color:#ef4444 }
 .typed{ width:100%; margin-top:10px; background:#060b16; border:1px solid #334155; color:var(--text); border-radius:6px; padding:12px }
 .metrics{ display:flex; align-items:center; gap:12px; margin-top:10px; flex-wrap:wrap }
 .mark-correct{ color:#22c55e }
