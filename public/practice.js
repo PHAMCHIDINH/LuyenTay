@@ -35,16 +35,39 @@ let testMode = {
 };
 
 function computeScore(target, typed, durationMs){
+  // Word-level comparison to avoid cascading errors due to extra/missing characters
+  const tWords = tokenizeWords(target);
+  const yWords = tokenizeWords(typed);
+  const errors = wordEditDistance(tWords, yWords);
+  // Retain char-based metrics if needed later
   const totalChars = target.length;
-  let correct = 0;
-  const len = Math.min(target.length, typed.length);
-  for (let i=0;i<len;i++) if (target[i]===typed[i]) correct++;
-  const errors = Math.max(0, typed.length - correct) + Math.max(0, totalChars - typed.length);
   const minutes = Math.max(0.001, (durationMs||0)/60000);
-  const grossWPM = typed.length / 5 / minutes;
-  const netWPM = Math.max(0, grossWPM - errors/ minutes / 5);
-  const accuracy = totalChars ? Math.max(0, Math.min(1, correct/totalChars)) : 1;
-  return { totalChars, typedChars: typed.length, correct, errors, accuracy, grossWPM, netWPM };
+  const grossWPM = (typed.length) / 5 / minutes;
+  const netWPM = Math.max(0, grossWPM - errors / minutes); // approximate at word granularity
+  const accuracy = tWords.length ? Math.max(0, Math.min(1, (tWords.length - errors) / tWords.length)) : 1;
+  return { totalChars, typedChars: typed.length, errors, accuracy, grossWPM, netWPM };
+}
+
+function tokenizeWords(s){
+  return (s || '').trim().split(/\s+/).filter(Boolean);
+}
+
+function wordEditDistance(a, b){
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, ()=>Array(n+1).fill(0));
+  for (let i=0;i<=m;i++) dp[i][0] = i;
+  for (let j=0;j<=n;j++) dp[0][j] = j;
+  for (let i=1;i<=m;i++){
+    for (let j=1;j<=n;j++){
+      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i-1][j] + 1,      // deletion
+        dp[i][j-1] + 1,      // insertion
+        dp[i-1][j-1] + cost  // substitution
+      );
+    }
+  }
+  return dp[m][n];
 }
 
 function escapeHtml(s){

@@ -84,18 +84,39 @@ app.post('/api/score', (req, res) => {
 
 function computeScore(target, typed, durationMs) {
   const totalChars = target.length;
-  // Compare char by char
-  let correct = 0;
-  const len = Math.min(target.length, typed.length);
-  for (let i = 0; i < len; i++) if (target[i] === typed[i]) correct++;
-  const errors = Math.max(0, typed.length - correct) + Math.max(0, totalChars - typed.length);
+  // word-level edit distance to prevent cascading errors
+  const tw = tokenizeWords(target);
+  const yw = tokenizeWords(typed);
+  const errors = wordEditDistance(tw, yw);
 
   const minutes = Math.max(0.001, (durationMs || 0) / 60000);
   const grossWPM = typed.length / 5 / minutes;
-  const netWPM = Math.max(0, grossWPM - errors / minutes / 5);
-  const accuracy = totalChars ? Math.max(0, Math.min(1, correct / totalChars)) : 1;
+  const netWPM = Math.max(0, grossWPM - errors / minutes);
+  const accuracy = tw.length ? Math.max(0, Math.min(1, (tw.length - errors) / tw.length)) : 1;
 
-  return { totalChars, typedChars: typed.length, correct, errors, accuracy, grossWPM, netWPM };
+  return { totalChars, typedChars: typed.length, errors, accuracy, grossWPM, netWPM };
+}
+
+function tokenizeWords(s){
+  return (s || '').trim().split(/\s+/).filter(Boolean);
+}
+
+function wordEditDistance(a, b){
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, ()=>Array(n+1).fill(0));
+  for (let i=0;i<=m;i++) dp[i][0] = i;
+  for (let j=0;j<=n;j++) dp[0][j] = j;
+  for (let i=1;i<=m;i++){
+    for (let j=1;j<=n;j++){
+      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i-1][j] + 1,
+        dp[i][j-1] + 1,
+        dp[i-1][j-1] + cost
+      );
+    }
+  }
+  return dp[m][n];
 }
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
