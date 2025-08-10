@@ -22,7 +22,7 @@ let startTime = null;
 let timerId = null;       // metrics updater
 let countdownId = null;   // per-round countdown
 let breakId = null;       // break countdown
-const timeLimitMs = 10_000; // 1 minute per requirement
+const timeLimitMs = 60_000; // 1 minute per requirement
 const breakMs = 5_000;      // 5 seconds break
 let testMode = {
   active: false,
