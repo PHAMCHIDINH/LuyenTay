@@ -30,7 +30,8 @@ let testMode = {
   maxRounds: 3,
   best: null,
   results: [],
-  status: 'idle' // idle | waiting | running | break | finished
+  status: 'idle', // idle | waiting | running | break | finished
+  lastErrors: null
 };
 
 function computeScore(target, typed, durationMs){
@@ -91,13 +92,22 @@ function resetTimer(){
 function updateLiveMetrics(){
   if (!doc) return;
   const typed = $('#typed').value;
-  const dur = Date.now() - startTime;
-  const s = computeScore(doc.content, typed, dur);
-  $('#errors').textContent = 'Lỗi: ' + s.errors;
+  // Chỉ hiển thị lỗi sau khi kết thúc mỗi lần, tránh tính lỗi theo từng phím (IME tiếng Việt)
+  const errEl = document.getElementById('errors');
+  if (testMode.active && (testMode.status === 'running' || testMode.status === 'waiting')){
+    errEl.textContent = 'Lỗi: —';
+  } else if (testMode.lastErrors != null){
+    errEl.textContent = 'Lỗi: ' + testMode.lastErrors;
+  }
   const words = countWords(typed);
   const wordsEl = document.getElementById('words');
   if (wordsEl) wordsEl.textContent = 'Từ: ' + words;
-  $('#target').innerHTML = renderDiff(doc.content, typed);
+  // Trong khi đang gõ, để giảm nhiễu cho IME tiếng Việt, chỉ hiển thị văn bản gốc
+  if (testMode.active && testMode.status === 'running'){
+    $('#target').textContent = doc.content;
+  } else {
+    $('#target').innerHTML = renderDiff(doc.content, typed);
+  }
 }
 
 function startCountdown(){
@@ -133,11 +143,13 @@ function startTest(){
   testMode.best = null;
   testMode.results = [];
   testMode.status = 'waiting';
+  testMode.lastErrors = null;
   $('#typed').value = '';
   $('#typed').disabled = false;
   // start button removed; auto mode
   updateRoundInfo();
   updateTimerUI('Chờ bắt đầu...');
+  const errEl = document.getElementById('errors'); if (errEl) errEl.textContent = 'Lỗi: —';
 }
 
 function prepareNextRound(){
@@ -147,11 +159,13 @@ function prepareNextRound(){
   }
   testMode.round += 1;
   testMode.status = 'waiting';
+  testMode.lastErrors = null;
   $('#typed').value = '';
   $('#typed').disabled = false;
   $('#typed').focus();
   updateRoundInfo();
   updateTimerUI('Chờ bắt đầu...');
+  const errEl = document.getElementById('errors'); if (errEl) errEl.textContent = 'Lỗi: —';
 }
 
 function endRound(){
@@ -164,6 +178,8 @@ function endRound(){
   $('#typed').disabled = true;
   appendResultCard(testMode.round, s);
   updateBestInfo();
+  testMode.lastErrors = s.errors;
+  const errEl = document.getElementById('errors'); if (errEl) errEl.textContent = 'Lỗi: ' + s.errors;
   startBreak();
 }
 
