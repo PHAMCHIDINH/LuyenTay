@@ -8,21 +8,40 @@
 </head>
 <body>
   <div class="container">
-    <a href="/" class="btn" style="display:inline-block;margin-bottom:10px">← Về trang tài liệu</a>
+    <a href="/" class="btn" style="display:inline-block;margin-bottom:10px">← Trang tài liệu</a>
 
     <section class="section">
-      <h2>Bài luyện</h2>
+      <div class="status-bar">
+        <div>
+          <strong>Bài luyện</strong>
+          <span class="pill" id="roundInfo">Lần: 0/3</span>
+        </div>
+        <div class="timer-big" id="timer">00:00</div>
+      </div>
       <h3 id="docTitle" style="margin-top:0"></h3>
       <div id="target" class="target"></div>
       <textarea id="typed" class="typed" rows="6" placeholder="Bắt đầu gõ khi sẵn sàng..."></textarea>
       <div class="metrics">
-        <span id="acc">Độ chính xác: 0%</span>
-        <span id="wpm">WPM: 0</span>
         <span id="errors">Lỗi: 0</span>
-        <button id="finishBtn">Kết thúc & chấm điểm</button>
+        <span id="words">Từ: 0</span>
       </div>
     </section>
 
+    <section class="section">
+      <h2>Chế độ kiểm tra (3 lần, 1 phút mỗi lần)</h2>
+      <div class="metrics" style="flex-wrap:wrap">
+        <span id="bestInfo">Tốt nhất: 0 từ</span>
+      </div>
+      <div id="testResults"></div>
+    </section>
+
+  </div>
+  <div class="overlay" id="overlay">
+    <div class="panel">
+      <h3>Chế độ kiểm tra</h3>
+      <p>Gõ 3 lần, mỗi lần 1 phút. Hệ thống tự đếm khi bạn gõ ký tự đầu tiên. Giữa các lần sẽ nghỉ 5 giây.</p>
+      <button id="overlayClose" class="btn">Tôi đã hiểu</button>
+    </div>
   </div>
   <script src="/practice.js"></script>
 </body>

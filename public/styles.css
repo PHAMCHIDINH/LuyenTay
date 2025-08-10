@@ -11,13 +11,30 @@ button{ background:var(--accent); color:#04202b; border:none; padding:10px 14px;
 button:hover{ filter:brightness(1.05) }
 a.btn{ background:var(--accent); color:#04202b; text-decoration:none; padding:10px 14px; border-radius:6px; display:inline-block; font-weight:600 }
 a.btn:hover{ filter:brightness(1.05) }
+#topbar{ position:sticky; top:0; background:rgba(15,23,42,0.8); backdrop-filter: blur(6px); border-bottom:1px solid #1f2937; z-index:10 }
+#topbar .container{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px }
+#brand{ font-weight:800; letter-spacing:0.3px }
+.muted{ color:var(--muted) }
+.btn-secondary{ background:#334155; color:#e5e7eb }
+.btn-secondary:hover{ filter:brightness(1.05) }
+#grid{ display:grid; grid-template-columns: 1fr; gap:16px }
+@media(min-width: 900px){ #grid{ grid-template-columns: 1fr 1fr } }
 #docs{ display:grid; grid-template-columns: repeat(auto-fill,minmax(240px,1fr)); gap:10px }
 .doc{ border:1px solid #334155; border-radius:8px; padding:10px; background:#0b1220 }
 .doc h3{ margin: 0 0 8px; font-size:16px }
-.doc p{ margin:0; color:var(--muted); font-size:13px; height: 38px; overflow:hidden }
+.doc p{ margin:0 0 8px; color:var(--muted); font-size:13px; height: 38px; overflow:hidden }
+.doc small{ color:var(--muted) }
 .doc button{ margin-top:8px }
 .target{ white-space:pre-wrap; background:#060b16; border:1px dashed #334155; padding:12px; border-radius:6px; min-height:100px }
 .typed{ width:100%; margin-top:10px; background:#060b16; border:1px solid #334155; color:var(--text); border-radius:6px; padding:12px }
-.metrics{ display:flex; align-items:center; gap:12px; margin-top:10px }
+.metrics{ display:flex; align-items:center; gap:12px; margin-top:10px; flex-wrap:wrap }
 .mark-correct{ color:#22c55e }
 .mark-wrong{ color:#ef4444; text-decoration:underline }
+.result-card{ border:1px solid #334155; border-radius:8px; padding:10px; margin-top:10px; background:#0b1220; display:flex; gap:16px; flex-wrap:wrap }
+.badge{ background:#1f2937; color:#e5e7eb; padding:2px 6px; border-radius:4px; font-size:12px }
+.status-bar{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px; background:#0b1220; border:1px solid #334155; border-radius:8px; margin-bottom:10px }
+.timer-big{ font-size:28px; font-weight:800; letter-spacing:1px }
+.pill{ padding:4px 8px; background:#0b1220; border:1px solid #334155; border-radius:999px }
+.overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:50 }
+.overlay .panel{ background:#0b1220; border:1px solid #334155; border-radius:10px; padding:20px; max-width:520px; text-align:center }
+.overlay h3{ margin-top:0 }

@@ -15,7 +15,7 @@ async function loadDocs(){
   const container = $('#docs');
   container.innerHTML = '';
   if (!docs.length){
-    container.innerHTML = '<p>Chưa có tài liệu. Hãy thêm ở trên.</p>';
+    container.innerHTML = '<p class="muted">Chưa có tài liệu. Hãy thêm ở bên trái hoặc dùng nút "Thêm mẫu nhanh".</p>';
     return;
   }
   for (const d of docs){
@@ -23,7 +23,10 @@ async function loadDocs(){
     el.className = 'doc';
     el.innerHTML = `<h3>${escapeHtml(d.title)}</h3>
       <p>${escapeHtml(d.content.slice(0, 120))}${d.content.length>120?'…':''}</p>
-      <a class="btn" href="/practice.html?id=${d.id}">Luyện bài này</a>`;
+      <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+        <a class="btn" href="/practice.html?id=${d.id}">Luyện bài này</a>
+        <small>${new Date(d.createdAt||Date.now()).toLocaleString('vi-VN')}</small>
+      </div>`;
     container.appendChild(el);
   }
 }
@@ -47,6 +50,17 @@ $('#addDocForm').addEventListener('submit', async (e)=>{
   // Redirect to practice page after adding
   location.href = `/practice.html?id=${doc.id}`;
 });
+
+// Add a quick sample document for first-time users
+const sampleBtn = document.getElementById('addSample');
+if (sampleBtn){
+  sampleBtn.addEventListener('click', async ()=>{
+    const title = 'Mẫu luyện gõ nhanh';
+    const content = 'Luyện gõ thật đều tay và chính xác. Gõ nhẹ nhàng, không vội vàng, giữ nhịp thở ổn định.';
+    const doc = await fetchJSON('/api/docs', { method:'POST', body: JSON.stringify({ title, content }) });
+    location.href = `/practice.html?id=${doc.id}`;
+  });
+}
 
 // Init
 loadDocs().catch(err=>{

@@ -19,7 +19,19 @@ async function fetchJSON(url, opts){
 
 let doc = null;
 let startTime = null;
-let timerId = null;
+let timerId = null;       // metrics updater
+let countdownId = null;   // per-round countdown
+let breakId = null;       // break countdown
+const timeLimitMs = 10_000; // 1 minute per requirement
+const breakMs = 5_000;      // 5 seconds break
+let testMode = {
+  active: false,
+  round: 0,
+  maxRounds: 3,
+  best: null,
+  results: [],
+  status: 'idle' // idle | waiting | running | break | finished
+};
 
 function computeScore(target, typed, durationMs){
   const totalChars = target.length;
@@ -73,6 +85,7 @@ function resetTimer(){
   if (timerId) clearInterval(timerId);
   startTime = Date.now();
   timerId = setInterval(updateLiveMetrics, 500);
+  if (!testMode.active) updateTimerUI('∞');
 }
 
 function updateLiveMetrics(){
@@ -80,24 +93,178 @@ function updateLiveMetrics(){
   const typed = $('#typed').value;
   const dur = Date.now() - startTime;
   const s = computeScore(doc.content, typed, dur);
-  $('#acc').textContent = 'Độ chính xác: ' + fmtPercent(s.accuracy);
-  $('#wpm').textContent = 'WPM: ' + fmtWpm(s.grossWPM);
   $('#errors').textContent = 'Lỗi: ' + s.errors;
+  const words = countWords(typed);
+  const wordsEl = document.getElementById('words');
+  if (wordsEl) wordsEl.textContent = 'Từ: ' + words;
   $('#target').innerHTML = renderDiff(doc.content, typed);
+}
+
+function startCountdown(){
+  if (countdownId) clearInterval(countdownId);
+  const endAt = startTime + timeLimitMs;
+  countdownId = setInterval(()=>{
+    const remain = Math.max(0, endAt - Date.now());
+    updateTimerUI(formatMs(remain));
+    if (remain <= 0){
+      clearInterval(countdownId);
+      countdownId = null;
+      endRound();
+    }
+  }, 200);
+}
+
+function updateTimerUI(text){
+  const el = document.getElementById('timer');
+  if (el) el.textContent = text;
+}
+
+function formatMs(ms){
+  const s = Math.ceil(ms/1000);
+  const mm = Math.floor(s/60).toString().padStart(2,'0');
+  const ss = Math.floor(s%60).toString().padStart(2,'0');
+  return `${mm}:${ss}`;
+}
+
+function startTest(){
+  // Enter test mode and wait for first key to start Round 1
+  testMode.active = true;
+  testMode.round = 1;
+  testMode.best = null;
+  testMode.results = [];
+  testMode.status = 'waiting';
+  $('#typed').value = '';
+  $('#typed').disabled = false;
+  // start button removed; auto mode
+  updateRoundInfo();
+  updateTimerUI('Chờ bắt đầu...');
+}
+
+function prepareNextRound(){
+  if (testMode.round >= testMode.maxRounds){
+    finishTest();
+    return;
+  }
+  testMode.round += 1;
+  testMode.status = 'waiting';
+  $('#typed').value = '';
+  $('#typed').disabled = false;
+  $('#typed').focus();
+  updateRoundInfo();
+  updateTimerUI('Chờ bắt đầu...');
+}
+
+function endRound(){
+  const typed = $('#typed').value;
+  const dur = Math.min(Date.now() - startTime, timeLimitMs);
+  const s = computeScore(doc.content, typed, dur);
+  s.wordsCount = countWords(typed);
+  testMode.results.push(s);
+  if (!testMode.best || s.wordsCount > testMode.best.wordsCount || (s.wordsCount === testMode.best.wordsCount && s.errors < testMode.best.errors)) testMode.best = s;
+  $('#typed').disabled = true;
+  appendResultCard(testMode.round, s);
+  updateBestInfo();
+  startBreak();
+}
+
+function updateRoundInfo(){
+  const el = document.getElementById('roundInfo');
+  if (el) el.textContent = `Lần: ${testMode.round}/${testMode.maxRounds}`;
+}
+
+function updateBestInfo(){
+  const el = document.getElementById('bestInfo');
+  if (el){
+  const best = testMode.best ? testMode.best.wordsCount : 0;
+  el.textContent = `Tốt nhất: ${best} từ`;
+  }
+}
+
+function appendResultCard(round, s){
+  const div = document.createElement('div');
+  div.className = 'result-card';
+  div.innerHTML = `
+    <span class="badge">Lần ${round}</span>
+  <span>Từ: ${s.wordsCount}</span>
+  <span>Lỗi: ${s.errors}</span>
+  `;
+  document.getElementById('testResults').appendChild(div);
 }
 
 $('#typed').addEventListener('input', updateLiveMetrics);
 
-$('#finishBtn').addEventListener('click', async ()=>{
-  if (!doc) return;
-  const typed = $('#typed').value;
-  const dur = Date.now() - startTime;
-  const score = await fetchJSON('/api/score', { method:'POST', body: JSON.stringify({ target: doc.content, typed, durationMs: dur })});
-  alert(`Điểm:\n- Độ chính xác: ${fmtPercent(score.accuracy)}\n- Gross WPM: ${fmtWpm(score.grossWPM)}\n- Net WPM: ${fmtWpm(score.netWPM)}\n- Lỗi: ${score.errors}`);
+function startRoundIfFirstKey(){
+  if (testMode.active && testMode.status === 'waiting'){
+    // Start the round from first key press
+    testMode.status = 'running';
+    if (timerId) clearInterval(timerId);
+    startTime = Date.now();
+    timerId = setInterval(updateLiveMetrics, 500);
+    startCountdown();
+  }
+}
+
+function startBreak(){
+  testMode.status = 'break';
+  updateTimerUI('Nghỉ: 00:05');
+  if (breakId) clearInterval(breakId);
+  const endAt = Date.now() + breakMs;
+  breakId = setInterval(()=>{
+    const remain = Math.max(0, endAt - Date.now());
+    const s = Math.ceil(remain/1000);
+    const mm = Math.floor(s/60).toString().padStart(2,'0');
+    const ss = Math.floor(s%60).toString().padStart(2,'0');
+    updateTimerUI('Nghỉ: ' + `${mm}:${ss}`);
+    if (remain <= 0){
+      clearInterval(breakId);
+      breakId = null;
+      prepareNextRound();
+    }
+  }, 200);
+}
+
+function finishTest(){
+  testMode.status = 'finished';
+  // no start button to restore
+  const best = testMode.best ? {
+    words: testMode.best.wordsCount,
+    err: testMode.best.errors
+  } : null;
+  if (best){
+    alert(`Kết thúc kiểm tra 3 lần\nTốt nhất: ${best.words} từ\nLỗi: ${best.err}`);
+  } else {
+    alert('Kết thúc kiểm tra.');
+  }
+}
+
+function countWords(text){
+  const t = (text || '').trim();
+  if (!t) return 0;
+  return t.split(/\s+/).filter(Boolean).length;
+}
+
+// Start the round timer when first key is pressed in test mode
+document.getElementById('typed').addEventListener('input', ()=>{
+  startRoundIfFirstKey();
+  updateLiveMetrics();
 });
 
 init().catch(err=>{
   console.error(err);
   alert('Không tải được bài luyện');
   location.href = '/';
+});
+
+// Auto-enter test mode on load
+window.addEventListener('load', ()=>{
+  // Show overlay once per session
+  try{
+    if (!sessionStorage.getItem('seenOverlay')){
+      const ov = document.getElementById('overlay');
+      if (ov) { ov.style.display = 'flex'; }
+      const btn = document.getElementById('overlayClose');
+      if (btn){ btn.onclick = ()=>{ ov.style.display = 'none'; sessionStorage.setItem('seenOverlay','1'); }; }
+    }
+  }catch{}
+  startTest();
 });
