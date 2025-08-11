@@ -83,16 +83,19 @@ app.post('/api/score', (req, res) => {
 });
 
 function computeScore(target, typed, durationMs) {
-  const totalChars = target.length;
+  // Normalize punctuation for fair scoring (e.g., curly quotes)
+  const nt = normalizeText(target);
+  const ny = normalizeText(typed);
+  const totalChars = nt.length;
   // character-level edit distance
-  const errors = charEditDistance(target, typed);
+  const errors = charEditDistance(nt, ny);
 
   const minutes = Math.max(0.001, (durationMs || 0) / 60000);
-  const grossWPM = typed.length / 5 / minutes;
+  const grossWPM = ny.length / 5 / minutes;
   const netWPM = Math.max(0, grossWPM - (errors / 5) / minutes);
   const accuracy = totalChars ? Math.max(0, Math.min(1, (totalChars - errors) / totalChars)) : 1;
 
-  return { totalChars, typedChars: typed.length, errors, accuracy, grossWPM, netWPM };
+  return { totalChars, typedChars: ny.length, errors, accuracy, grossWPM, netWPM };
 }
 
 function charEditDistance(a, b){
@@ -111,6 +114,14 @@ function charEditDistance(a, b){
     }
   }
   return dp[m][n];
+}
+
+function normalizeText(s){
+  return String(s || '')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u00A0/g, ' ');
 }
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));

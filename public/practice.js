@@ -41,13 +41,15 @@ let testMode = {
 
 function computeScore(target, typed, durationMs){
   // Character-level edit distance after completion
-  const errors = charEditDistance(target, typed);
-  const totalChars = target.length;
+  const nt = normalizeWord(target);
+  const ny = normalizeWord(typed);
+  const errors = charEditDistance(nt, ny);
+  const totalChars = nt.length;
   const minutes = Math.max(0.001, (durationMs||0)/60000);
-  const grossWPM = (typed.length) / 5 / minutes;
+  const grossWPM = (ny.length) / 5 / minutes;
   const netWPM = Math.max(0, grossWPM - (errors / 5) / minutes);
   const accuracy = totalChars ? Math.max(0, Math.min(1, (totalChars - errors) / totalChars)) : 1;
-  return { totalChars, typedChars: typed.length, errors, accuracy, grossWPM, netWPM };
+  return { totalChars, typedChars: ny.length, errors, accuracy, grossWPM, netWPM };
 }
 
 function charEditDistance(a, b){
@@ -74,9 +76,17 @@ function escapeHtml(s){
 
 // 10fastfingers-like flow: render words stream, single-word input, submit on Space/Enter
 function tokenizeWords(text){
-  // Extract word-like tokens (letters incl. Vietnamese range + digits)
-  const m = text.match(/[A-Za-zÀ-ỹà-ỹÁ-Ỹ0-9]+/g);
+  // Preserve punctuation by splitting on whitespace: e.g., "English,", "don't", "(test)" remain intact
+  const m = text.match(/\S+/g);
   return m ? m : [];
+}
+
+function normalizeWord(s){
+  return (s || '')
+    .replace(/[\u2018\u2019]/g, "'") // curly apostrophes to straight
+    .replace(/[\u201C\u201D]/g, '"') // curly double quotes to straight
+    .replace(/[\u2013\u2014]/g, '-')  // en/em dash to hyphen
+    .replace(/\u00A0/g, ' ');          // nbsp to space
 }
 
 function buildStream(count = 250){
@@ -350,8 +360,8 @@ document.getElementById('wordInput').addEventListener('keydown', (e)=>{
     const val = (e.target.value || '').trim();
     // Only advance if user actually typed something
     if (val.length > 0){
-      const target = streamWords[currentIndex] || '';
-      const ok = val === target;
+  const target = streamWords[currentIndex] || '';
+  const ok = normalizeWord(val) === normalizeWord(target);
       typedWords.push(val);
       markWordResult(currentIndex, ok);
       currentIndex += 1;
