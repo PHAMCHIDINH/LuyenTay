@@ -39,6 +39,61 @@ app.get('/api/docs', (req, res) => {
   res.json(readDocs());
 });
 
+// Default preset documents (English)
+const DEFAULT_DOCS = [
+  {
+    title: 'EN 6: travelling overseas',
+    content: `Travelling overseas can be complicated if you wish to hire and drive a car. We often don’t give much thought to the problems encountered in a strange country when we are planning our itinerary. At
+home it is second nature for us to jump into the car and drive somewhere.`
+  },
+  {
+    title: 'EN 7: autumn leaves',
+    content: `When the leaves on trees and bushes get their autumn tunings it is a very colorful time in the garden. The sad dest part about autumn is the anticipation of those cold, dreary winter months that must be endured   before we once again enjoy
+the sight of the buds coming out.`
+  },
+  {
+    title: 'EN 9: prepare dinner',
+    content: `The children in the family wanted to surprise their mother and prepare dinner for her. Tom decided to check the availability of the required ingredients. Jan wrote the list as he called out the missing items: a cup of champignons, 5 veal fillets, unsalted butter and an onion.`
+  },
+  {
+    title: 'EN 15: tax returns',
+    content: `As June draws closer, we start to think about our tax returns, and we despair of finding the vouchers and receipts required for everything we wish to claim. Some of us do know exactly where they are, but others search everywhere: in boxes, flowerpots and even queerer places.`
+  },
+  {
+    title: 'EN 17: first speed lesson',
+    content: `This is the first speed lesson in this book. You can add to your speed if you make the most of the work on this page, which is set up to help you to type at a smooth and fast pace. First you type a lot of easy words that will get your fingers flying, and then you try to keep them flying at your best speed for a longer and longer time.`
+  },
+  {
+    title: 'EN 18: good team',
+    content: `Most of us like to be on a good team and to help it win, if we can. We get a lot of pleasure from doing our share, and we do not like t he fellow who ducks doing his. That is one thing to remember if you ever go to work on an office team. None of us like the fellow who ducks his share of the work.`
+  }
+];
+
+// Seed defaults if missing (by title)
+function seedDefaultDocs(){
+  const docs = readDocs();
+  const byTitle = new Map(docs.map(d => [d.title, d]));
+  let changed = false;
+  for (const def of DEFAULT_DOCS){
+    const existing = byTitle.get(def.title);
+    if (existing){
+      if (existing.content !== def.content){
+        existing.content = def.content;
+        changed = true;
+      }
+    } else {
+      const newDoc = { id: nanoid(10), title: def.title, content: def.content, createdAt: Date.now() };
+      docs.unshift(newDoc);
+      changed = true;
+    }
+  }
+  if (changed){
+    writeDocs(docs);
+    console.log('Seeded/updated default docs.');
+  }
+}
+seedDefaultDocs();
+
 app.post('/api/docs', (req, res) => {
   const { title, content } = req.body || {};
   if (!content || typeof content !== 'string') {
