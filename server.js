@@ -12,10 +12,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const DOCS_FILE = path.join(DATA_DIR, 'docs.json');
+const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
 
 // Ensure data dir
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(DOCS_FILE)) fs.writeFileSync(DOCS_FILE, JSON.stringify([]));
+if (!fs.existsSync(HISTORY_FILE)) fs.writeFileSync(HISTORY_FILE, JSON.stringify([]));
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -32,6 +34,19 @@ function readDocs() {
 }
 function writeDocs(docs) {
   fs.writeFileSync(DOCS_FILE, JSON.stringify(docs, null, 2));
+}
+
+// History helpers
+function readHistory(){
+  try{
+    const raw = fs.readFileSync(HISTORY_FILE, 'utf8');
+    return JSON.parse(raw);
+  }catch{
+    return [];
+  }
+}
+function writeHistory(items){
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(items, null, 2));
 }
 
 // Routes
@@ -109,6 +124,50 @@ app.post('/api/docs', (req, res) => {
   docs.unshift(doc);
   writeDocs(docs);
   res.status(201).json(doc);
+});
+
+// History APIs
+// List history with optional filters: ?limit=200&userId=...&since=timestamp&until=timestamp
+app.get('/api/history', (req, res) => {
+  const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit, 10) || 200));
+  const userId = req.query.userId ? String(req.query.userId) : null;
+  const since = req.query.since ? Number(req.query.since) : null;
+  const until = req.query.until ? Number(req.query.until) : null;
+  let items = readHistory();
+  if (userId) items = items.filter(i => i.userId === userId);
+  if (since) items = items.filter(i => (i.createdAt || 0) >= since);
+  if (until) items = items.filter(i => (i.createdAt || 0) <= until);
+  items.sort((a,b)=> (b.createdAt||0) - (a.createdAt||0));
+  res.json(items.slice(0, limit));
+});
+
+// Append a history record
+app.post('/api/history', (req, res) => {
+  const { userId, sessionId, round, docId, docTitle, mode, words, errors, durationMs, startedAt, client } = req.body || {};
+  if (!userId || !docId || typeof words !== 'number' || typeof errors !== 'number'){
+    return res.status(400).json({ error: 'userId, docId, words, errors are required' });
+  }
+  const item = {
+    id: nanoid(12),
+    userId: String(userId),
+    sessionId: sessionId ? String(sessionId) : undefined,
+    round: typeof round === 'number' ? round : undefined,
+    docId: String(docId),
+    docTitle: docTitle ? String(docTitle) : undefined,
+    mode: mode === 'script' ? 'script' : 'random',
+    words: Number(words),
+    errors: Number(errors),
+    durationMs: typeof durationMs === 'number' ? durationMs : undefined,
+    startedAt: typeof startedAt === 'number' ? startedAt : undefined,
+    client: client && typeof client === 'object' ? client : undefined,
+    createdAt: Date.now(),
+  };
+  const items = readHistory();
+  items.unshift(item);
+  // Optional cap to prevent unbounded growth
+  if (items.length > 50000) items.length = 50000;
+  writeHistory(items);
+  res.status(201).json({ ok: true, id: item.id });
 });
 
 app.get('/api/docs/:id', (req, res) => {

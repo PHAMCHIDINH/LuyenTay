@@ -23,6 +23,8 @@ let streamWords = [];
 let typedWords = [];
 let currentIndex = 0;
 let wordMode = 'random'; // 'random' | 'script'
+let sessionId = null;
+let userId = null;
 let startTime = null;
 let timerId = null;       // metrics updater
 let countdownId = null;   // per-round countdown
@@ -131,7 +133,7 @@ function updateCurrentHighlight(){
   if (cur) {
     cur.classList.add('cur');
     // ensure visible
-    try{ cur.scrollIntoView({ block: 'center', inline: 'nearest' }); }catch{}
+  try{ cur.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }); }catch{}
   }
 }
 
@@ -219,6 +221,9 @@ function startTest(){
   testMode.results = [];
   testMode.status = 'waiting';
   testMode.lastErrors = null;
+  // session & user
+  sessionId = sessionId || (Date.now().toString(36) + Math.random().toString(36).slice(2,8));
+  try{ userId = localStorage.getItem('USER_ID') || null; }catch{}
   // Reset round stream
   streamWords = buildStream();
   typedWords = [];
@@ -269,6 +274,26 @@ function endRound(){
   testMode.lastErrors = s.errors;
   const errEl = document.getElementById('errors'); if (errEl) errEl.textContent = 'Lỗi: ' + s.errors;
   startBreak();
+
+  // Post history (fire-and-forget)
+  try{
+    const body = {
+      userId: userId || 'anonymous',
+      sessionId,
+      round: testMode.round,
+      docId: getQueryParam('id'),
+      docTitle: doc.title,
+      mode: wordMode,
+      words: s.wordsCount,
+      errors: s.errors,
+      durationMs: dur,
+      startedAt: startTime,
+      client: { ua: navigator.userAgent }
+    };
+    fetch((localStorage.getItem('API_BASE')||'') + '/api/history', {
+      method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body)
+    }).catch(()=>{});
+  }catch{}
 }
 
 function updateRoundInfo(){

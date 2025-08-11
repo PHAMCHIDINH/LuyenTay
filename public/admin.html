@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin - Lịch sử luyện tập</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .table{ width:100%; border-collapse: collapse; }
+    .table th, .table td{ border-bottom:1px solid #334155; padding:8px 10px; text-align:left; }
+    .table th{ color:#cbd5e1; font-weight:600 }
+    .filters{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0 }
+    .filters input, .filters select{ background:#060b16; border:1px solid #334155; color:#e2e8f0; border-radius:6px; padding:6px 8px }
+    .muted{ color:#94a3b8 }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="btn" style="display:inline-block;margin-bottom:10px">← Trang tài liệu</a>
+    <section class="section">
+      <div class="status-bar">
+        <div><strong>Admin</strong> <span class="pill" id="count">0 bản ghi</span></div>
+        <div class="timer-big" id="clock">—</div>
+      </div>
+      <div class="filters">
+        <label>Secret:</label> <input type="password" id="secret" placeholder="mã" />
+        <label>User:</label> <input type="text" id="userId" placeholder="user id (tùy chọn)" />
+        <label>Limit:</label> <input type="number" id="limit" value="200" min="1" max="1000" />
+        <button class="btn" id="loadBtn">Tải</button>
+      </div>
+      <div style="overflow:auto">
+        <table class="table" id="tbl">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>User</th>
+              <th>Doc</th>
+              <th>Mode</th>
+              <th>Vòng</th>
+              <th>Từ</th>
+              <th>Lỗi</th>
+              <th>ms</th>
+              <th class="muted">Phiên</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <script>
+    const API_BASE = localStorage.getItem('API_BASE') || '';
+    const ADMIN_SECRET = localStorage.getItem('ADMIN_SECRET') || '';
+    document.getElementById('secret').value = ADMIN_SECRET;
+
+    function fmt(ts){ try{ return new Date(ts).toLocaleString('vi-VN'); }catch{ return String(ts) } }
+
+    async function fetchJSON(url){
+      const full = url.startsWith('http') ? url : API_BASE + url;
+      const res = await fetch(full);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    async function load(){
+      const secret = document.getElementById('secret').value.trim();
+      localStorage.setItem('ADMIN_SECRET', secret);
+      if (secret !== (window._adminSecret || '')){
+        alert('Sai mã admin');
+        return;
+      }
+      const limit = Number(document.getElementById('limit').value || 200);
+      const userId = document.getElementById('userId').value.trim();
+      const q = new URLSearchParams();
+      q.set('limit', String(limit));
+      if (userId) q.set('userId', userId);
+      const rows = await fetchJSON('/api/history?' + q.toString());
+      document.getElementById('count').textContent = rows.length + ' bản ghi';
+      const tb = document.querySelector('#tbl tbody');
+      tb.innerHTML = '';
+      for (const r of rows){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${fmt(r.createdAt)}</td>
+          <td>${r.userId||''}</td>
+          <td title="${(r.docTitle||'')}">${r.docId}</td>
+          <td>${r.mode||''}</td>
+          <td>${r.round ?? ''}</td>
+          <td>${r.words}</td>
+          <td>${r.errors}</td>
+          <td>${r.durationMs ?? ''}</td>
+          <td class="muted">${r.sessionId||''}</td>
+        `;
+        tb.appendChild(tr);
+      }
+    }
+
+    setInterval(()=>{
+      const el = document.getElementById('clock');
+      if (el) el.textContent = new Date().toLocaleTimeString('vi-VN');
+    }, 1000);
+
+    document.getElementById('loadBtn').onclick = load;
+
+    // Hidden admin gate: set at runtime in devtools: window._adminSecret = 'your_code'
+    // Or manually set localStorage ADMIN_SECRET and reload.
+  </script>
+</body>
+</html>
